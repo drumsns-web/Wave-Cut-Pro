@@ -1071,16 +1071,23 @@ audio{width:100%;margin:8px 0}
 .mic-clip-warn.show{ display:block; animation:clipflash .5s; }
 @keyframes clipflash{0%{background:rgba(239,68,68,.4)}100%{background:rgba(239,68,68,.15)}}
 .mic-gain-row{
-  display:flex; align-items:center; gap:8px; margin-top:10px;
+  display:flex; flex-direction:column; gap:6px; margin-top:10px;
+}
+.mic-gain-row-top{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.mic-gain-row-slider{
+  display:flex; align-items:center; gap:8px;
 }
 .mic-gain-row label{ font-size:12px; white-space:nowrap; }
 .mic-gain-row label span{ color:#35e0a1; font-family:ui-monospace,monospace; font-weight:700; }
-.mic-gain-row input[type="range"]{ flex:1; accent-color:#35e0a1; }
+.mic-gain-row input[type="range"]{ flex:1; accent-color:#35e0a1; min-width:0; }
 .mic-gain-reset{
-  padding:4px 8px !important; margin:0 !important; font-size:10px !important;
-  min-height:0 !important; border-radius:7px !important;
+  padding:4px 10px !important; margin:0 !important; font-size:10px !important;
+  min-height:0 !important; border-radius:7px !important; white-space:nowrap;
   background:rgba(255,255,255,.07) !important;
   border:1px solid rgba(255,255,255,.14) !important; color:#94a3b8 !important;
+  flex-shrink:0;
 }
 
 /* ─── オフセット調整の大きなボタン ─── */
@@ -1435,9 +1442,13 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
       <div class="mic-clip-warn" id="micClipWarn">⚠ 音割れ（クリップ）検出 — ゲインを下げてください</div>
     </div>
     <div class="mic-gain-row">
-      <label style="margin:0">マイクゲイン：<span id="micGainLabel">0 dB</span></label>
-      <input id="micGainSlider" type="range" min="-12" max="24" step="0.5" value="0">
-      <button id="micGainReset" class="mic-gain-reset">0dB</button>
+      <div class="mic-gain-row-top">
+        <label style="margin:0">マイクゲイン：<span id="micGainLabel">0 dB</span></label>
+        <button id="micGainReset" class="mic-gain-reset">0dBにリセット</button>
+      </div>
+      <div class="mic-gain-row-slider">
+        <input id="micGainSlider" type="range" min="-12" max="24" step="0.5" value="0">
+      </div>
     </div>
     <div class="row" style="margin-top:8px">
       <div>
