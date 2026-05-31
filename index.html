@@ -4,10 +4,15 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Wave Cut Pro</title>
+<link rel="icon" type="image/png" sizes="192x192" href="icon.png">
 <link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta name="apple-mobile-web-app-title" content="Wave Cut Pro">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="application-name" content="Wave Cut Pro">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0b1020">
 <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js"></script>
@@ -1543,7 +1548,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
           </div>
           <!-- 行2：タイミング補正 -->
           <div class="track-edit-bar-row">
-            <span style="font-size:9px;color:var(--muted);font-weight:700;white-space:nowrap;flex-shrink:0">ズレ補正</span>
+            <span style="font-size:9px;color:var(--muted);font-weight:700;white-space:nowrap;flex-shrink:0">🎚 全体シフト</span>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-quick-shift neg" data-track="main" data-ms="-500" title="-500ms">⏪</button>
             <button class="teb-btn teb-quick-shift neg" data-track="main" data-ms="-100" title="-100ms">‹‹</button>
@@ -1648,7 +1653,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <button class="teb-btn teb-restart" id="tebRestartTake" data-track="take" title="最初に戻る">⏮</button>
           </div>
           <div class="track-edit-bar-row">
-            <span style="font-size:9px;color:var(--muted);font-weight:700;white-space:nowrap;flex-shrink:0">ズレ補正</span>
+            <span style="font-size:9px;color:var(--muted);font-weight:700;white-space:nowrap;flex-shrink:0">🎚 全体シフト</span>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-quick-shift neg" data-track="take" data-ms="-500" title="-500ms">⏪</button>
             <button class="teb-btn teb-quick-shift neg" data-track="take" data-ms="-100" title="-100ms">‹‹</button>
@@ -1772,7 +1777,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <button class="teb-btn teb-restart" id="tebRestartChorus" data-track="chorus" title="最初に戻る">⏮</button>
           </div>
           <div class="track-edit-bar-row">
-            <span style="font-size:9px;color:var(--muted);font-weight:700;white-space:nowrap;flex-shrink:0">ズレ補正</span>
+            <span style="font-size:9px;color:var(--muted);font-weight:700;white-space:nowrap;flex-shrink:0">🎚 全体シフト</span>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-quick-shift neg" data-track="chorus" data-ms="-500" title="-500ms">⏪</button>
             <button class="teb-btn teb-quick-shift neg" data-track="chorus" data-ms="-100" title="-100ms">‹‹</button>
@@ -1875,6 +1880,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
       <button type="button" class="track-edit-action" data-edit-action="fx"><span class="icon">FX</span><span>エフェクト<small>FXパネルを開く</small></span></button>
       <button type="button" class="track-edit-action" data-edit-action="undo"><span class="icon">↩</span><span>元に戻す<small>直前の編集を取り消す</small></span></button>
       <button type="button" class="track-edit-action" data-edit-action="redo"><span class="icon">↪</span><span>やり直す<small>アンドゥを取り消す</small></span></button>
+      <button type="button" class="track-edit-action" data-edit-action="delete-clip" style="border-color:rgba(248,113,113,.35)!important;"><span class="icon" style="background:rgba(239,68,68,.18);color:#f87171">🗑</span><span style="color:#fca5a5">クリップ削除<small>選択／カーソル位置のクリップを消す</small></span></button>
     </div>
   </div>
 
@@ -5439,7 +5445,7 @@ function createExtraTrackHTML(id, emoji, name){
             <button class="teb-btn teb-restart" id="tebRestart${c1}" data-track="${id}" title="最初に戻る">⏮</button>
           </div>
           <div class="track-edit-bar-row">
-            <span style="font-size:9px;color:var(--muted);font-weight:700;white-space:nowrap;flex-shrink:0">ズレ補正</span>
+            <span style="font-size:9px;color:var(--muted);font-weight:700;white-space:nowrap;flex-shrink:0">🎚 全体シフト</span>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-quick-shift neg" data-track="${id}" data-ms="-500" title="-500ms">⏪</button>
             <button class="teb-btn teb-quick-shift neg" data-track="${id}" data-ms="-100" title="-100ms">‹‹</button>
@@ -7408,6 +7414,47 @@ function performTrackSplit(track){
   }
 }
 
+// ── 選択中クリップを丸ごと削除（無音の空白として残す） ────────
+function performTrackDeleteClip(track){
+  const buf = bufferForTrack(track);
+  const st  = getTrackState(track);
+  if(!buf || !st) return;
+  const clips = trackClips[track] || [];
+  const clipId = st.selectedClipId;
+
+  // 選択クリップがある場合はそれを削除、なければカーソル位置のクリップを削除
+  let targetClip = clipId ? clips.find(c => c.id === clipId) : null;
+  if(!targetClip){
+    // カーソル位置のクリップを探す
+    const curSec = buf.duration * (st.playheadRatio || 0);
+    targetClip = clips.find(c => curSec >= c.startSec && curSec < c.startSec + (c.buffer ? c.buffer.duration : 0));
+  }
+  if(!targetClip){
+    if(fileStatus) fileStatus.textContent = "削除するクリップが見つかりません。クリップをタップして選択してください。";
+    return;
+  }
+
+  trackPushUndo(track, "クリップ削除");
+  // クリップを削除（配列から除去→無音の空白になる）
+  trackClips[track] = clips.filter(c => c.id !== targetClip.id);
+  st.selectedClipId = null;
+
+  // FXキャッシュを無効化
+  if(track === "take")        { takeFxBaked = false; takeFxBackup = null; }
+  else if(track === "chorus") { chorusFxBaked = false; chorusFxBackup = null; }
+  else if(isExtraTrack(track)){ const t=getExtraTrack(track); if(t){ t.fxBaked=false; t.fxBackup=null; } }
+  else                        { mainFxBaked = false; mainFxBackup = null; }
+
+  invalidateWaveformCache();
+  if(activeBufferType === track) refreshPreview();
+  drawStackedTimelines();
+  updateTrackEditBar(track);
+  updateButtons();
+  refreshWaveEditFromTrack(track, {switchToTrack: true});
+  const remain = (trackClips[track]||[]).length;
+  if(fileStatus) fileStatus.textContent = `🗑 クリップを削除しました（残り ${remain} 個）`;
+}
+
 function clearTrackSelection(track){
   const st = getTrackState(track);
   st.selStart = null;
@@ -7548,6 +7595,18 @@ function refreshTrackEditPopupButtons(track){
   popup.querySelectorAll("[data-edit-action]").forEach(btn=>{
     const action = btn.dataset.editAction;
     const fxMissing = action === "fx" && !document.getElementById(`fxToggle${cap(track)}`);
+    const clips = trackClips[track] || [];
+    const hasAnyClip = clips.length > 0;
+    // delete-clip: クリップが選択されているか、カーソル位置にクリップがある場合に有効
+    let canDeleteClip = false;
+    if(action === "delete-clip" && buf && hasAnyClip){
+      if(st.selectedClipId && clips.find(c=>c.id===st.selectedClipId)){
+        canDeleteClip = true;
+      } else {
+        const curSec = buf.duration * (st.playheadRatio || 0);
+        canDeleteClip = clips.some(c => curSec >= c.startSec && curSec < c.startSec + (c.buffer ? c.buffer.duration : 0));
+      }
+    }
     btn.disabled =
       (["play","stop","setA","setB","split","restart","hand","fx"].includes(action) && !buf) ||
       (["cut","copy"].includes(action) && !hasSel) ||
@@ -7555,6 +7614,7 @@ function refreshTrackEditPopupButtons(track){
       (action === "undo" && !st.undoStack.length) ||
       (action === "redo" && !(st.redoStack && st.redoStack.length)) ||
       (action.startsWith("nudge") && (!buf || track === "main")) ||
+      (action === "delete-clip" && !canDeleteClip) ||
       fxMissing;
     if(action === "hand") btn.classList.toggle("active", editClipMode);
   });
@@ -7614,6 +7674,9 @@ function installTrackEditPopup(){
         else if(action === "redo"){
           trackRedo(track);
           keepOpen = true;
+        }
+        else if(action === "delete-clip"){
+          performTrackDeleteClip(track);
         }
         if(keepOpen){
           updateTrackEditPopupInfo(track);
