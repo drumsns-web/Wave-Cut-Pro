@@ -7519,6 +7519,10 @@ function performTrackDeleteClip(track){
   trackClips[track] = clips.filter(c => c.id !== targetClip.id);
   st.selectedClipId = null;
 
+  // クリップ配列から統合バッファを再生成（これがないと波形が消えない）
+  if(typeof normalizeTrackClips === "function") normalizeTrackClips(track);
+  rebuildTrackBuffer(track);
+
   // FXキャッシュを無効化
   if(track === "take")        { takeFxBaked = false; takeFxBackup = null; }
   else if(track === "chorus") { chorusFxBaked = false; chorusFxBackup = null; }
