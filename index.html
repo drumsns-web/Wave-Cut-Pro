@@ -1370,6 +1370,8 @@ body.clip-edit-mode::before{
 
 .teb-btn.teb-split{ color:#f0abfc; border-color:rgba(240,171,252,.3) !important; }
 .teb-btn.teb-split:not(:disabled):active{ background:rgba(240,171,252,.2) !important; }
+.teb-btn.teb-delete-clip:not(:disabled){ color:#f87171; border-color:rgba(248,113,113,.4) !important; }
+.teb-btn.teb-delete-clip:not(:disabled):active{ background:rgba(239,68,68,.22) !important; }
 .wave-edit-toolbar{
   display:flex;
   flex-wrap:wrap;
@@ -1617,6 +1619,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <button class="teb-btn teb-copy"  id="tebCopyMain"  title="選択をコピー" disabled>⎘</button>
             <button class="teb-btn teb-paste" id="tebPasteMain" title="カーソル位置へ貼り付け" disabled>⎙</button>
             <button class="teb-btn teb-split" id="tebSplitMain" title="カーソル位置で分割">✂️</button>
+            <button class="teb-btn teb-delete-clip" id="tebDeleteClipMain" title="選択／カーソル位置のクリップを削除" disabled>🗑</button>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-ab" id="tebSetAMain" data-track="main" title="A地点を設定" disabled>A</button>
             <button class="teb-btn teb-ab" id="tebSetBMain" data-track="main" title="B地点を設定" disabled>B</button>
@@ -1723,6 +1726,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <button class="teb-btn teb-copy"  id="tebCopyTake"  title="選択をコピー" disabled>⎘</button>
             <button class="teb-btn teb-paste" id="tebPasteTake" title="カーソル位置へ貼り付け" disabled>⎙</button>
             <button class="teb-btn teb-split" id="tebSplitTake" title="カーソル位置で分割">✂️</button>
+            <button class="teb-btn teb-delete-clip" id="tebDeleteClipTake" title="選択／カーソル位置のクリップを削除" disabled>🗑</button>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-ab" id="tebSetATake" data-track="take" title="A地点を設定" disabled>A</button>
             <button class="teb-btn teb-ab" id="tebSetBTake" data-track="take" title="B地点を設定" disabled>B</button>
@@ -1847,6 +1851,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <button class="teb-btn teb-copy"  id="tebCopyChorus"  title="選択をコピー" disabled>⎘</button>
             <button class="teb-btn teb-paste" id="tebPasteChorus" title="カーソル位置へ貼り付け" disabled>⎙</button>
             <button class="teb-btn teb-split" id="tebSplitChorus" title="カーソル位置で分割">✂️</button>
+            <button class="teb-btn teb-delete-clip" id="tebDeleteClipChorus" title="選択／カーソル位置のクリップを削除" disabled>🗑</button>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-ab" id="tebSetAChorus" data-track="chorus" title="A地点を設定" disabled>A</button>
             <button class="teb-btn teb-ab" id="tebSetBChorus" data-track="chorus" title="B地点を設定" disabled>B</button>
@@ -5518,6 +5523,7 @@ function createExtraTrackHTML(id, emoji, name){
             <button class="teb-btn teb-copy"  id="tebCopy${c1}"  title="選択をコピー" disabled>⎘</button>
             <button class="teb-btn teb-paste" id="tebPaste${c1}" title="カーソル位置へ貼り付け" disabled>⎙</button>
             <button class="teb-btn teb-split" id="tebSplit${c1}" title="カーソル位置で分割">✂️</button>
+            <button class="teb-btn teb-delete-clip" id="tebDeleteClip${c1}" title="選択／カーソル位置のクリップを削除" disabled>🗑</button>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-ab" id="tebSetA${c1}" data-track="${id}" title="A地点を設定" disabled>A</button>
             <button class="teb-btn teb-ab" id="tebSetB${c1}" data-track="${id}" title="B地点を設定" disabled>B</button>
@@ -7284,6 +7290,7 @@ function updateTrackEditBar(track){
     redo:  `tebRedo${cap(track)}`,
     setA:  `tebSetA${cap(track)}`,
     setB:  `tebSetB${cap(track)}`,
+    delClip: `tebDeleteClip${cap(track)}`,
   };
   const el = id => document.getElementById(id);
   if(el(ids.menu))  el(ids.menu).disabled  = !buf;
@@ -7294,6 +7301,20 @@ function updateTrackEditBar(track){
   if(el(ids.redo))  el(ids.redo).disabled  = !(st.redoStack && st.redoStack.length);
   if(el(ids.setA))  el(ids.setA).disabled  = !buf;
   if(el(ids.setB))  el(ids.setB).disabled  = !buf;
+  // 🗑 クリップ削除：クリップ選択中 or カーソル位置にクリップがあれば有効
+  if(el(ids.delClip)){
+    const clips = trackClips[track] || [];
+    let canDel = false;
+    if(buf && clips.length){
+      if(st.selectedClipId && clips.find(c=>c.id===st.selectedClipId)){
+        canDel = true;
+      } else {
+        const curSec = buf.duration * (st.playheadRatio || 0);
+        canDel = clips.some(c => curSec >= c.startSec && curSec < c.startSec + (c.buffer ? c.buffer.duration : 0));
+      }
+    }
+    el(ids.delClip).disabled = !canDel;
+  }
 
   // 時刻表示
   const tl = document.getElementById(`timeLabel${cap(track)}`);
@@ -7844,6 +7865,10 @@ function setupTrackEditBar(track){
   // ✀ 分割（カーソル位置でクリップを2つに割る）
   const splitBtn_ = document.getElementById(`tebSplit${c}`);
   if(splitBtn_) splitBtn_.onclick = ()=>performTrackSplit(track);
+
+  // 🗑 クリップ削除（選択／カーソル位置のクリップを削除）
+  const delClipBtn_ = document.getElementById(`tebDeleteClip${c}`);
+  if(delClipBtn_) delClipBtn_.onclick = ()=>performTrackDeleteClip(track);
 
   // «‹›» シフトボタン（トラック全体を前後に移動）
   // 旧.teb-shift-l/r と 新.offset-big-btn 両対応
