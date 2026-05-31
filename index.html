@@ -1490,7 +1490,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
       <!-- 波形エリア -->
       <div class="track-lane-side">
         <div class="track-lane-header">
-          <span class="track-lane-name editable-track-name" id="trackNameMain" data-track="main" data-emoji="🎹" data-default="カラオケ" title="タップで名前を変更">🎹 カラオケ</span>
+          <span class="track-lane-name editable-track-name" id="trackNameMain" data-track="main" data-emoji="" data-default="カラオケ" title="タップで名前を変更">カラオケ</span>
           <span class="track-rec-badge">●REC</span>
         </div>
         <div class="track-lane-sub" id="laneMainInfo">未読み込み</div>
@@ -1597,7 +1597,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
       <!-- 波形エリア -->
       <div class="track-lane-side">
         <div class="track-lane-header">
-          <span class="track-lane-name editable-track-name" id="trackNameTake" data-track="take" data-emoji="🎤" data-default="ヴォーカル" title="タップで名前を変更">🎤 ヴォーカル</span>
+          <span class="track-lane-name editable-track-name" id="trackNameTake" data-track="take" data-emoji="" data-default="ヴォーカル" title="タップで名前を変更">ヴォーカル</span>
           <span class="track-rec-badge">●REC</span>
         </div>
         <div class="track-lane-sub" id="laneTakeInfo">未録音</div>
@@ -1721,7 +1721,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
       <!-- サイドパネル -->
       <div class="track-lane-side">
         <div class="track-lane-header">
-          <span class="track-lane-name editable-track-name" id="trackNameChorus" data-track="chorus" data-emoji="🎶" data-default="コーラス" title="タップで名前を変更">🎶 コーラス</span>
+          <span class="track-lane-name editable-track-name" id="trackNameChorus" data-track="chorus" data-emoji="" data-default="コーラス" title="タップで名前を変更">コーラス</span>
           <span class="track-rec-badge">●REC</span>
         </div>
         <div class="track-lane-sub" id="laneChorusInfo">未録音</div>
@@ -1918,7 +1918,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
     background:linear-gradient(135deg,rgba(53,224,161,.12),rgba(79,140,255,.08));
     border:1px solid rgba(53,224,161,.25);border-radius:12px;
   ">
-    <span style="font-size:18px" id="waveEditTrackEmoji">🎹</span>
+    <span style="display:none" id="waveEditTrackEmoji"></span>
     <div style="flex:1">
       <div style="font-size:11px;color:var(--muted);font-weight:700;line-height:1">編集中のトラック</div>
       <div style="font-size:14px;font-weight:900;color:#35e0a1;line-height:1.3" id="waveEditTrackName">カラオケ</div>
@@ -5394,7 +5394,7 @@ function createExtraTrackHTML(id, emoji, name){
     <div class="track-lane" data-track="${id}" id="lane${c1}">
       <div class="track-lane-side">
         <div class="track-lane-header">
-          <span class="track-lane-name editable-track-name" id="trackName${c1}" data-track="${id}" data-emoji="${emoji}" data-default="${name}" title="タップで名前を変更">${emoji} ${name}</span>
+          <span class="track-lane-name editable-track-name" id="trackName${c1}" data-track="${id}" data-emoji="" data-default="${name}" title="タップで名前を変更">${name}</span>
           <span class="track-rec-badge">●REC</span>
         </div>
         <div class="track-lane-sub" id="lane${c1}Info">未録音</div>
@@ -5495,7 +5495,7 @@ function removeExtraTrack(id){
   const idx = extraTracks.findIndex(t => t.id === id);
   if(idx < 0) return;
   const t = extraTracks[idx];
-  if(!confirm(`「${t.emoji} ${t.name}」を削除しますか？（音源も消えます）`)) return;
+  if(!confirm(`「${t.name}」を削除しますか？（音源も消えます）`)) return;
   extraTracks.splice(idx, 1);
   delete trackClips[id];
   delete trackState[id];
@@ -7253,7 +7253,7 @@ function trackDisplayName(track){
   const el = document.getElementById("trackName" + cap(track));
   if(el) return el.textContent.trim();
   const extra = typeof getExtraTrack === "function" ? getExtraTrack(track) : null;
-  if(extra) return `${extra.emoji || ""} ${extra.name || "トラック"}`.trim();
+  if(extra) return extra.name || "トラック";
   if(track === "main") return "カラオケ";
   if(track === "take") return "ヴォーカル";
   if(track === "chorus") return "コーラス";
@@ -8623,9 +8623,9 @@ function rebuildWaveTrackSelect(){
   sel.innerHTML = "";
   // 固定3トラック
   const fixed = [
-    { id:"main",   label:"🎹 " + getTrackDisplayName("main", "カラオケ") },
-    { id:"take",   label:"🎤 " + getTrackDisplayName("take", "ヴォーカル") },
-    { id:"chorus", label:"🎶 " + getTrackDisplayName("chorus", "コーラス") },
+    { id:"main",   label:getTrackDisplayName("main", "カラオケ") },
+    { id:"take",   label:getTrackDisplayName("take", "ヴォーカル") },
+    { id:"chorus", label:getTrackDisplayName("chorus", "コーラス") },
   ];
   fixed.forEach(t=>{
     const o = document.createElement("option");
@@ -8636,7 +8636,7 @@ function rebuildWaveTrackSelect(){
   if(typeof extraTracks !== "undefined"){
     extraTracks.forEach(t=>{
       const o = document.createElement("option");
-      o.value = t.id; o.textContent = t.emoji + " " + t.name;
+      o.value = t.id; o.textContent = t.name;
       sel.appendChild(o);
     });
   }
@@ -8689,10 +8689,10 @@ function switchActiveBufferTo(track){
   const ss = document.getElementById('sourceStatus');
   if(ss){
     let label = track;
-    if(track === "main") label = "🎹 " + getTrackDisplayName("main","カラオケ");
-    else if(track === "take") label = "🎤 " + getTrackDisplayName("take","ヴォーカル");
-    else if(track === "chorus") label = "🎶 " + getTrackDisplayName("chorus","コーラス");
-    else if(typeof getExtraTrack === "function"){ const t=getExtraTrack(track); if(t) label = t.emoji+" "+t.name; }
+    if(track === "main") label = getTrackDisplayName("main","カラオケ");
+    else if(track === "take") label = getTrackDisplayName("take","ヴォーカル");
+    else if(track === "chorus") label = getTrackDisplayName("chorus","コーラス");
+    else if(typeof getExtraTrack === "function"){ const t=getExtraTrack(track); if(t) label = t.name; }
     ss.textContent = '編集中：' + label;
   }
 }
@@ -8701,18 +8701,18 @@ function _updateWaveEditBadge(track){
   const badgeEmoji = document.getElementById("waveEditTrackEmoji");
   const badgeName  = document.getElementById("waveEditTrackName");
   if(!badgeEmoji || !badgeName) return;
-  let emoji = "🎵", name = track;
+  let name = track;
   if(track === "main"){
-    emoji = "🎹"; name = getTrackDisplayName("main","カラオケ");
+    name = getTrackDisplayName("main","カラオケ");
   } else if(track === "take"){
-    emoji = "🎤"; name = getTrackDisplayName("take","ヴォーカル");
+    name = getTrackDisplayName("take","ヴォーカル");
   } else if(track === "chorus"){
-    emoji = "🎶"; name = getTrackDisplayName("chorus","コーラス");
+    name = getTrackDisplayName("chorus","コーラス");
   } else if(typeof getExtraTrack === "function"){
     const t = getExtraTrack(track);
-    if(t){ emoji = t.emoji; name = t.name; }
+    if(t){ name = t.name; }
   }
-  badgeEmoji.textContent = emoji;
+  badgeEmoji.textContent = "";
   badgeName.textContent  = name;
 }
 
@@ -8874,18 +8874,18 @@ function _updateWaveEditBadge(track){
 
   let currentTrack = null;
   let currentEl    = null;
-  let currentEmoji = "🎵";
+  
 
   function buildPresets(currentName){
     presetsEl.innerHTML = "";
     PRESETS.forEach(p => {
       const btn = document.createElement("button");
       btn.className = "tnp-preset-btn";
-      btn.textContent = p.emoji + " " + p.name;
+      btn.textContent = p.name;
       if(p.name === currentName) btn.classList.add("selected");
       btn.addEventListener("click", ()=>{
         customIn.value = p.name;
-        currentEmoji   = p.emoji;
+        
         presetsEl.querySelectorAll(".tnp-preset-btn").forEach(b => b.classList.remove("selected"));
         btn.classList.add("selected");
       });
@@ -8902,7 +8902,7 @@ function _updateWaveEditBadge(track){
 
     currentTrack = track;
     currentEl    = el;
-    currentEmoji = emoji;
+    
 
     buildPresets(curName);
     customIn.value = curName;
@@ -8934,18 +8934,17 @@ function _updateWaveEditBadge(track){
     const defName = currentEl.dataset.default || "トラック";
     if(!name) name = defName;
     name = name.slice(0, 14);
-    const emoji = currentEmoji;
+    
 
     const names = loadNames();
     if(name === defName){ delete names[currentTrack]; }
     else { names[currentTrack] = name; }
     saveNames(names);
 
-    currentEl.dataset.emoji = emoji;
-    currentEl.textContent   = emoji + " " + name;
+    currentEl.textContent   = name;
 
     if(typeof rebuildWaveTrackSelect === "function") rebuildWaveTrackSelect();
-    if(fileStatus) fileStatus.textContent = `トラック名を「${emoji} ${name}」に変更しました`;
+    if(fileStatus) fileStatus.textContent = `トラック名を「${name}」に変更しました`;
     closePopup();
   }
 
@@ -8963,7 +8962,7 @@ function _updateWaveEditBadge(track){
     const defName = el.dataset.default || "トラック";
     const names   = loadNames();
     const curName = names[track] || defName;
-    el.textContent = emoji + " " + curName;
+    el.textContent = curName;
     el.addEventListener("click", e => { e.stopPropagation(); openPopup(el); });
   }
 
