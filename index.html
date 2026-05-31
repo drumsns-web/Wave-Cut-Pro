@@ -1051,18 +1051,39 @@ audio{width:100%;margin:8px 0}
 
 /* ─── マイクゲイン＆ピークメーター ─── */
 .mic-meter-bar{ position:relative; overflow:hidden; }
+/* 推奨ゾーン背景（fillの下に敷く） */
+.mic-zone{ position:absolute; top:0; bottom:0; pointer-events:none; }
+.mic-zone-safe{   left:0;   width:70%;  background:rgba(53,224,161,.12); }
+.mic-zone-warn{   left:70%; width:20%;  background:rgba(251,191,36,.16); }
+.mic-zone-danger{ left:90%; width:10%;  background:rgba(239,68,68,.20); }
+/* 危険ライン（90%＝これを超えると音割れリスク） */
+.mic-redline{
+  position:absolute; top:0; bottom:0; left:90%; width:2px;
+  background:#ef4444; box-shadow:0 0 5px rgba(239,68,68,.8);
+  pointer-events:none; z-index:3;
+}
 .mic-meter-fill{
+  position:relative; z-index:2;
   background:linear-gradient(90deg,#35e0a1 0%,#35e0a1 60%,#fbbf24 80%,#f87171 95%) !important;
-  transition:width .05s linear;
+  transition:width .05s linear; opacity:.92;
 }
 .mic-meter-peak{
-  position:absolute; top:0; bottom:0; width:3px;
+  position:absolute; top:0; bottom:0; width:3px; z-index:4;
   background:#fde047; box-shadow:0 0 6px #fde047;
   left:0; transition:left .25s ease-out, background .1s;
   pointer-events:none; opacity:0;
 }
 .mic-meter-peak.show{ opacity:1; }
 .mic-meter-peak.clip{ background:#ef4444; box-shadow:0 0 8px #ef4444; }
+.mic-zone-legend{
+  display:flex; gap:12px; margin-top:4px; flex-wrap:wrap;
+  font-size:10px; color:var(--muted); font-weight:700;
+}
+.mic-zone-legend span{ display:inline-flex; align-items:center; gap:3px; }
+.mic-zone-legend .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+.mic-zone-legend .dot.safe{ background:#35e0a1; }
+.mic-zone-legend .dot.warn{ background:#fbbf24; }
+.mic-zone-legend .dot.danger{ background:#ef4444; }
 .mic-clip-warn{
   display:none; margin-top:5px; padding:4px 8px;
   background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.4);
@@ -1070,6 +1091,31 @@ audio{width:100%;margin:8px 0}
 }
 .mic-clip-warn.show{ display:block; animation:clipflash .5s; }
 @keyframes clipflash{0%{background:rgba(239,68,68,.4)}100%{background:rgba(239,68,68,.15)}}
+/* ゲインの目安ガイド */
+.mic-gain-guide{
+  margin-top:8px; border:1px solid rgba(255,255,255,.1); border-radius:10px;
+  background:rgba(255,255,255,.025); overflow:hidden;
+}
+.mic-gain-guide summary{
+  cursor:pointer; padding:8px 10px; font-size:11px; font-weight:800;
+  color:#cbd5e1; user-select:none; list-style:none;
+}
+.mic-gain-guide summary::-webkit-details-marker{ display:none; }
+.mic-gain-guide summary::before{ content:"💡 "; }
+.mic-gain-guide[open] summary{ border-bottom:1px solid rgba(255,255,255,.08); }
+.mic-gain-guide-body{ padding:8px 10px 10px; font-size:11px; color:var(--muted); line-height:1.5; }
+.mic-gain-guide-body table{ width:100%; border-collapse:collapse; margin:6px 0; }
+.mic-gain-guide-body th, .mic-gain-guide-body td{
+  text-align:left; padding:4px 6px; border-bottom:1px solid rgba(255,255,255,.06);
+  font-size:11px;
+}
+.mic-gain-guide-body th{ color:#cbd5e1; font-weight:800; }
+.mic-gain-guide-body td:first-child{ color:#e2e8f0; font-weight:700; white-space:nowrap; }
+.mic-gain-guide-body .tip{
+  margin-top:6px; padding:6px 8px; border-radius:8px;
+  background:rgba(53,224,161,.08); border:1px solid rgba(53,224,161,.2);
+  color:#a7f3d0; font-weight:700;
+}
 .mic-gain-row{
   display:flex; flex-direction:column; gap:4px; margin-top:10px;
 }
@@ -1432,8 +1478,19 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
         <span class="mic-meter-state" id="micLevelText">OFF</span>
       </div>
       <div class="mic-meter-bar" id="micMeterBar">
+        <!-- 推奨ゾーン背景：緑(安全)→黄(注意)→赤(危険) -->
+        <div class="mic-zone mic-zone-safe"></div>
+        <div class="mic-zone mic-zone-warn"></div>
+        <div class="mic-zone mic-zone-danger"></div>
+        <!-- 危険ライン（これを超えないように） -->
+        <div class="mic-redline"></div>
         <div class="mic-meter-fill" id="micLevelFill"></div>
         <div class="mic-meter-peak" id="micMeterPeak"></div>
+      </div>
+      <div class="mic-zone-legend">
+        <span><i class="dot safe"></i>安全</span>
+        <span><i class="dot warn"></i>適正（ここを狙う）</span>
+        <span><i class="dot danger"></i>音割れ</span>
       </div>
       <canvas id="micLevelCanvas" class="mic-meter-canvas"></canvas>
       <div class="mic-clip-warn" id="micClipWarn">⚠ 音割れ（クリップ）検出 — ゲインを下げてください</div>
@@ -1445,6 +1502,20 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
         <button id="micGainReset" class="mic-gain-reset">0dB</button>
       </div>
     </div>
+    <details class="mic-gain-guide">
+      <summary>ゲインの目安・録音シーン別の設定</summary>
+      <div class="mic-gain-guide-body">
+        基本は「<strong style="color:#a7f3d0">いちばん大きい音でもメーターが赤いライン（右端の手前）を超えない</strong>」ように設定します。緑〜黄色の境目あたりに収まるのが理想です。赤に達すると音が割れて元に戻せません。迷ったら<strong>少し小さめ</strong>が安全です（後から音量は上げられます）。
+        <table>
+          <tr><th>録音シーン</th><th>目安</th><th>ねらい</th></tr>
+          <tr><td>カラオケ・歌</td><td>0 〜 +6 dB</td><td>サビで黄色に触れる程度</td></tr>
+          <tr><td>弾き語り・アコギ</td><td>0 〜 +9 dB</td><td>ピッキングの強い音で赤を超えない</td></tr>
+          <tr><td>バンド・大音量</td><td>-12 〜 0 dB</td><td>音が大きいので下げて余裕を持たせる</td></tr>
+          <tr><td>ナレーション・小声</td><td>+6 〜 +15 dB</td><td>声が小さいので持ち上げる</td></tr>
+        </table>
+        <div class="tip">⚠ 赤ラインを超えたり「音割れ検出」が出たら、ゲインを2〜3dBずつ下げてください。デジタル録音では一度割れた音は修復できません。</div>
+      </div>
+    </details>
     <div class="row" style="margin-top:8px">
       <div>
         <label>録音チャンネル</label>
@@ -2807,9 +2878,12 @@ function startMicLevelMeter(sourceOrStream){
       const isClipping = peak >= 0.99;
       if(isClipping) micClipUntil = now + 1500;
       const clipActive = now < micClipUntil;
+      // 予兆：赤ライン(=メーター90%)に近づいているか
+      const nearLimit = !clipActive && pct >= 85;
 
       if(micMeterPeak){
-        const peakPct = Math.min(100, micPeakHold * 100);
+        // メーターfillと同じスケール（rms*260相当）でピーク位置を表示
+        const peakPct = Math.min(100, Math.round(micPeakHold * 260));
         micMeterPeak.style.left = `calc(${peakPct}% - 2px)`;
         micMeterPeak.classList.add("show");
         micMeterPeak.classList.toggle("clip", clipActive);
@@ -2818,9 +2892,9 @@ function startMicLevelMeter(sourceOrStream){
         micClipWarn.classList.toggle("show", clipActive);
       }
       if(micLevelText){
-        if(clipActive) micLevelText.textContent = "⚠ ピーク";
-        else micLevelText.textContent = pct > 4 ? `入力 ${pct}%` : "ON / 待機";
-        micLevelText.style.color = clipActive ? "#f87171" : "";
+        if(clipActive){ micLevelText.textContent = "⚠ 音割れ"; micLevelText.style.color = "#f87171"; }
+        else if(nearLimit){ micLevelText.textContent = "▲ 大きめ"; micLevelText.style.color = "#fbbf24"; }
+        else { micLevelText.textContent = pct > 4 ? `入力 ${pct}%` : "ON / 待機"; micLevelText.style.color = ""; }
       }
 
       // 波形（クリップ時は赤）
