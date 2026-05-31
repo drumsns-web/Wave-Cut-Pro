@@ -7707,6 +7707,8 @@ function openTrackEditPopup(track, anchorEl=null, mode="track"){
   trackEditPopupAnchor = anchorEl;
   trackEditPopupMode = mode;
   activeBufferType = track;
+  // グローバル選択状態をこのトラックの保存値と同期（カット/コピー判定が正しく効くように）
+  if(typeof syncActiveSelectionFromTrack === "function") syncActiveSelectionFromTrack(track);
   const popup = document.getElementById("trackEditPopup");
   const backdrop = document.getElementById("trackEditPopupBackdrop");
   updateTrackEditPopupInfo(track);
