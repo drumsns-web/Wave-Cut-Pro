@@ -1014,6 +1014,7 @@ audio{width:100%;margin:8px 0}
 .teb-btn.teb-play:not(:disabled){color:#4ade80;border-color:rgba(74,222,128,.35) !important;}
 .teb-btn.teb-play.playing{color:#fff;background:rgba(74,222,128,.25) !important;}
 .teb-btn.teb-marker{color:#fbbf24;border-color:rgba(251,191,36,.4) !important;}
+.teb-btn.teb-align:not(:disabled){color:#34d399;border-color:rgba(52,211,153,.4) !important;}
 .teb-btn.teb-cut:not(:disabled){color:#f87171;border-color:rgba(248,113,113,.3) !important;}
 .teb-btn.teb-copy:not(:disabled){color:#60a5fa;border-color:rgba(96,165,250,.3) !important;}
 .teb-btn.teb-paste:not(:disabled){color:#4ade80;border-color:rgba(74,222,128,.3) !important;}
@@ -1609,6 +1610,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <button class="teb-btn teb-play" id="tebPlayMain" title="カーソル位置から再生" disabled>▶</button>
             <button class="teb-btn teb-stop-play" id="tebStopMain" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarkerMain" data-track="main" title="現在位置にマークを置く">📍</button>
+            <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-menu" id="tebMenuMain" data-track="main" title="編集メニュー" disabled>編集</button>
             <button class="teb-btn teb-edit" id="editClipMain" title="クリップ編集モード（つかんで動かす）">✋</button>
@@ -1717,6 +1719,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <button class="teb-btn teb-play" id="tebPlayTake" title="カーソル位置から再生" disabled>▶</button>
             <button class="teb-btn teb-stop-play" id="tebStopTake" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarkerTake" data-track="take" title="現在位置にマークを置く">📍</button>
+            <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-menu" id="tebMenuTake" data-track="take" title="編集メニュー" disabled>編集</button>
             <button class="teb-btn teb-edit" id="editClipTake" title="クリップ編集モード（つかんで動かす）">✋</button>
@@ -1843,6 +1846,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <button class="teb-btn teb-play" id="tebPlayChorus" title="カーソル位置から再生" disabled>▶</button>
             <button class="teb-btn teb-stop-play" id="tebStopChorus" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarkerChorus" data-track="chorus" title="現在位置にマークを置く">📍</button>
+            <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-menu" id="tebMenuChorus" data-track="chorus" title="編集メニュー" disabled>編集</button>
             <button class="teb-btn teb-edit" id="editClipChorus" title="クリップ編集モード（つかんで動かす）">✋</button>
@@ -1977,8 +1981,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
     <button id="trackStackMixBtn" class="green" disabled>MIX確定</button>
   </div>
   <div class="track-mini-controls" style="margin-top:6px">
-    <button id="alignMarkerBtn" disabled title="マーク（📍）を付けた全トラックが縦に揃うよう自動でずらします">🎯 マークでトラックを揃える</button>
-    <button id="clearMarkersBtn" title="マークを消す">📍 マーク消去</button>
+    <button id="clearMarkersBtn" title="マークを消す">📍 マークを全消去</button>
   </div>
 
   <!-- ダミー（JS互換） -->
@@ -2795,10 +2798,9 @@ function clearAllMarkers(){
 }
 
 function updateMarkerAlignButton(){
-  const btn = document.getElementById("alignMarkerBtn");
-  if(!btn) return;
   const count = Object.keys(trackMarkers).filter(tr=>trackMarkers[tr] != null && bufferForTrack(tr)).length;
-  btn.disabled = (count < 2);
+  const enabled = (count >= 2);
+  document.querySelectorAll(".teb-align").forEach(btn=>{ btn.disabled = !enabled; });
 }
 function getTrackVolume(track){
   let el;
@@ -5584,6 +5586,7 @@ function createExtraTrackHTML(id, emoji, name){
             <button class="teb-btn teb-play" id="tebPlay${c1}" title="カーソル位置から再生" disabled>▶</button>
             <button class="teb-btn teb-stop-play" id="tebStop${c1}" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarker${c1}" data-track="${id}" title="現在位置にマークを置く">📍</button>
+            <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-menu" id="tebMenu${c1}" data-track="${id}" title="編集メニュー" disabled>編集</button>
             <button class="teb-btn teb-edit" id="editClip${c1}" title="クリップ編集モード">✋</button>
@@ -8238,17 +8241,21 @@ if(trackStackMixBtn){
   };
 }
 
-// 📍 マークボタン（全トラック・イベント委譲）と 🎯 揃える / マーク消去
+// 📍 マークボタン・🎯 揃えるボタン（全トラック・イベント委譲）と マーク消去
 (function setupMarkerButtons(){
-  // イベント委譲：追加トラックの📍ボタンも自動で拾える
   document.addEventListener("click", (e)=>{
-    const btn = e.target.closest(".teb-marker");
-    if(!btn) return;
-    const track = btn.getAttribute("data-track");
-    if(track){ setTrackMarker(track); }
+    const markBtn = e.target.closest(".teb-marker");
+    if(markBtn){
+      const track = markBtn.getAttribute("data-track");
+      if(track){ setTrackMarker(track); }
+      return;
+    }
+    const alignBtn = e.target.closest(".teb-align");
+    if(alignBtn){
+      if(!alignBtn.disabled) alignTracksByMarker();
+      return;
+    }
   });
-  const align = document.getElementById("alignMarkerBtn");
-  if(align) align.onclick = ()=>{ alignTracksByMarker(); };
   const clear = document.getElementById("clearMarkersBtn");
   if(clear) clear.onclick = ()=>{ clearAllMarkers(); };
 })();
