@@ -1608,6 +1608,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <span class="track-time-label" id="timeLabelMain">--:--.--</span>
             <button class="teb-btn teb-play" id="tebPlayMain" title="カーソル位置から再生" disabled>▶</button>
             <button class="teb-btn teb-stop-play" id="tebStopMain" title="停止">■</button>
+            <button class="teb-btn teb-marker" id="tebMarkerMain" data-track="main" title="現在位置にマークを置く">📍</button>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-menu" id="tebMenuMain" data-track="main" title="編集メニュー" disabled>編集</button>
             <button class="teb-btn teb-edit" id="editClipMain" title="クリップ編集モード（つかんで動かす）">✋</button>
@@ -1976,7 +1977,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
     <button id="trackStackMixBtn" class="green" disabled>MIX確定</button>
   </div>
   <div class="track-mini-controls" style="margin-top:6px">
-    <button id="alignMarkerBtn" disabled title="トラック2と3のマーク（📍）が縦に揃うよう自動でずらします">🎯 マークでトラック2・3を揃える</button>
+    <button id="alignMarkerBtn" disabled title="マーク（📍）を付けた全トラックが縦に揃うよう自動でずらします">🎯 マークでトラックを揃える</button>
     <button id="clearMarkersBtn" title="マークを消す">📍 マーク消去</button>
   </div>
 
@@ -2236,8 +2237,8 @@ let initialEditState = null;
 let initialEditLabel = "";
 let takeOffsetMs = 0;
 let chorusOffsetMs = 0;
-let takeMarkerSec = null;   // トラック2のマーカー位置（トラック内の秒、null=なし）
-let chorusMarkerSec = null; // トラック3のマーカー位置（トラック内の秒、null=なし）
+let mainOffsetMs = 0;
+let trackMarkers = {}; // トラックID → マーカー位置（トラック内の秒）。全トラック対応
 let karaokePlaybackDuringRecord = null;
 let karaokePlaybackSource = null;
 let karaokePlaybackGain = null;
@@ -2736,43 +2737,68 @@ function getTrackBuffer(track){
 function getTrackOffsetMs(track){
   if(track === "take") return takeOffsetMs;
   if(track === "chorus") return chorusOffsetMs;
+  if(track === "main") return mainOffsetMs;
   if(isExtraTrack(track)){ const t = getExtraTrack(track); return t ? t.offsetMs : 0; }
   return 0;
 }
 
-// ── マーカー機能（トラック2・3の頭出し位置を揃える）────────────
+// ── マーカー機能（全トラックの頭出し位置を揃える）────────────
 function setTrackMarker(track){
   const buf = bufferForTrack(track);
   if(!buf) return;
   const st = getTrackState(track);
   const sec = buf.duration * (st.playheadRatio || 0);
-  if(track === "take") takeMarkerSec = sec;
-  else if(track === "chorus") chorusMarkerSec = sec;
+  trackMarkers[track] = sec;
   if(typeof drawStackedTimelines === "function") drawStackedTimelines();
   if(typeof fileStatus !== "undefined" && fileStatus) fileStatus.textContent = `📍 ${trackDisplayName(track)} にマークを置きました（${formatTime(sec)}）`;
   updateMarkerAlignButton();
 }
+
+function setTrackOffsetMs(track, ms){
+  const v = Math.max(0, Math.round(ms));
+  if(track === "take") takeOffsetMs = v;
+  else if(track === "chorus") chorusOffsetMs = v;
+  else if(track === "main") mainOffsetMs = v;
+  else if(isExtraTrack(track)){ const t = getExtraTrack(track); if(t) t.offsetMs = v; }
+}
+
+// マークが置かれた全トラックを、マーク位置が縦に揃うようオフセット調整
 function alignTracksByMarker(){
-  if(takeMarkerSec == null || chorusMarkerSec == null){
-    if(typeof fileStatus !== "undefined" && fileStatus) fileStatus.textContent = "トラック2と3の両方にマークを置いてください。";
+  const marked = Object.keys(trackMarkers).filter(tr=>{
+    return trackMarkers[tr] != null && bufferForTrack(tr);
+  });
+  if(marked.length < 2){
+    if(typeof fileStatus !== "undefined" && fileStatus) fileStatus.textContent = "2つ以上のトラックにマークを置いてください。";
     return;
   }
-  let newChorusOffset = takeOffsetMs + (takeMarkerSec - chorusMarkerSec) * 1000;
-  let newTakeOffset = takeOffsetMs;
-  if(newChorusOffset < 0){
-    newTakeOffset = takeOffsetMs - newChorusOffset;
-    newChorusOffset = 0;
-  }
-  takeOffsetMs = Math.round(newTakeOffset);
-  chorusOffsetMs = Math.round(newChorusOffset);
+  // 各トラックのマーク絶対位置 = 現在オフセット(秒) + マーク位置(秒)
+  const absById = {};
+  marked.forEach(tr=>{ absById[tr] = offsetForTrack(tr) + trackMarkers[tr]; });
+  // 基準＝最も遅いマーク絶対位置（全トラックを後ろにずらすだけで揃う＝負が出ない）
+  const targetAbs = Math.max(...marked.map(tr=>absById[tr]));
+  // 各トラックの新オフセット(秒) = targetAbs - マーク位置(秒)（マーク位置がtargetAbsに来る）
+  marked.forEach(tr=>{
+    const newOffSec = targetAbs - trackMarkers[tr];
+    setTrackOffsetMs(tr, newOffSec * 1000);
+  });
   if(typeof invalidateWaveformCache === "function") invalidateWaveformCache();
   if(typeof drawStackedTimelines === "function") drawStackedTimelines();
   if(typeof updateButtons === "function") updateButtons();
-  if(typeof fileStatus !== "undefined" && fileStatus) fileStatus.textContent = `🎯 マークの位置でトラック2と3を揃えました。`;
+  if(typeof fileStatus !== "undefined" && fileStatus) fileStatus.textContent = `🎯 マークの位置で${marked.length}トラックを揃えました。`;
 }
+
+function clearAllMarkers(){
+  trackMarkers = {};
+  if(typeof drawStackedTimelines === "function") drawStackedTimelines();
+  updateMarkerAlignButton();
+  if(typeof fileStatus !== "undefined" && fileStatus) fileStatus.textContent = "マークを消去しました。";
+}
+
 function updateMarkerAlignButton(){
   const btn = document.getElementById("alignMarkerBtn");
-  if(btn) btn.disabled = !(takeMarkerSec != null && chorusMarkerSec != null);
+  if(!btn) return;
+  const count = Object.keys(trackMarkers).filter(tr=>trackMarkers[tr] != null && bufferForTrack(tr)).length;
+  btn.disabled = (count < 2);
 }
 function getTrackVolume(track){
   let el;
@@ -5557,6 +5583,7 @@ function createExtraTrackHTML(id, emoji, name){
             <span class="track-time-label" id="timeLabel${c1}">--:--.--</span>
             <button class="teb-btn teb-play" id="tebPlay${c1}" title="カーソル位置から再生" disabled>▶</button>
             <button class="teb-btn teb-stop-play" id="tebStop${c1}" title="停止">■</button>
+            <button class="teb-btn teb-marker" id="tebMarker${c1}" data-track="${id}" title="現在位置にマークを置く">📍</button>
             <span class="teb-sep"></span>
             <button class="teb-btn teb-menu" id="tebMenu${c1}" data-track="${id}" title="編集メニュー" disabled>編集</button>
             <button class="teb-btn teb-edit" id="editClip${c1}" title="クリップ編集モード">✋</button>
@@ -5793,6 +5820,7 @@ function bufferForTrack(track){
 function offsetForTrack(track){
   if(track === "take") return takeOffsetMs / 1000;
   if(track === "chorus") return chorusOffsetMs / 1000;
+  if(track === "main") return mainOffsetMs / 1000;
   if(isExtraTrack(track)){ const t = getExtraTrack(track); return t ? t.offsetMs/1000 : 0; }
   return 0;
 }
@@ -5888,9 +5916,7 @@ function drawMiniTrackWave(canvasEl, track, labelColor){
   }
 
   // ── マーカー（頭出し位置を揃えるための目印）──
-  let markerSec = null;
-  if(track === "take") markerSec = takeMarkerSec;
-  else if(track === "chorus") markerSec = chorusMarkerSec;
+  const markerSec = (trackMarkers && trackMarkers[track] != null) ? trackMarkers[track] : null;
   if(markerSec != null){
     const markerAbs = offsetSec + markerSec;
     if(markerAbs >= viewStartSec && markerAbs <= viewEndSec){
@@ -8212,21 +8238,19 @@ if(trackStackMixBtn){
   };
 }
 
-// 📍 マークボタン（take/chorus）と 🎯 揃える / マーク消去
+// 📍 マークボタン（全トラック・イベント委譲）と 🎯 揃える / マーク消去
 (function setupMarkerButtons(){
-  const mt = document.getElementById("tebMarkerTake");
-  if(mt) mt.onclick = ()=>{ setTrackMarker("take"); };
-  const mc = document.getElementById("tebMarkerChorus");
-  if(mc) mc.onclick = ()=>{ setTrackMarker("chorus"); };
+  // イベント委譲：追加トラックの📍ボタンも自動で拾える
+  document.addEventListener("click", (e)=>{
+    const btn = e.target.closest(".teb-marker");
+    if(!btn) return;
+    const track = btn.getAttribute("data-track");
+    if(track){ setTrackMarker(track); }
+  });
   const align = document.getElementById("alignMarkerBtn");
   if(align) align.onclick = ()=>{ alignTracksByMarker(); };
   const clear = document.getElementById("clearMarkersBtn");
-  if(clear) clear.onclick = ()=>{
-    takeMarkerSec = null; chorusMarkerSec = null;
-    if(typeof drawStackedTimelines === "function") drawStackedTimelines();
-    updateMarkerAlignButton();
-    if(typeof fileStatus !== "undefined" && fileStatus) fileStatus.textContent = "マークを消去しました。";
-  };
+  if(clear) clear.onclick = ()=>{ clearAllMarkers(); };
 })();
 
 // 各トラック行の停止ボタン
