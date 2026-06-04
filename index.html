@@ -2766,6 +2766,7 @@ function setTrackOffsetMs(track, ms){
 }
 
 // マークが置かれた全トラックを、マーク位置が縦に揃うようオフセット調整
+// 基準＝最も早いマーク絶対位置。他トラックを前に詰める。頭がはみ出す場合は確認。
 function alignTracksByMarker(){
   const marked = Object.keys(trackMarkers).filter(tr=>{
     return trackMarkers[tr] != null && bufferForTrack(tr);
@@ -2777,17 +2778,79 @@ function alignTracksByMarker(){
   // 各トラックのマーク絶対位置 = 現在オフセット(秒) + マーク位置(秒)
   const absById = {};
   marked.forEach(tr=>{ absById[tr] = offsetForTrack(tr) + trackMarkers[tr]; });
-  // 基準＝最も遅いマーク絶対位置（全トラックを後ろにずらすだけで揃う＝負が出ない）
-  const targetAbs = Math.max(...marked.map(tr=>absById[tr]));
-  // 各トラックの新オフセット(秒) = targetAbs - マーク位置(秒)（マーク位置がtargetAbsに来る）
+  // 基準＝最も早いマーク絶対位置（前に詰める方向。録音の遅れを前に持ってくる用途）
+  const targetAbs = Math.min(...marked.map(tr=>absById[tr]));
+
+  // 各トラックの新オフセット(秒) = targetAbs - マーク位置(秒)
+  // これが負になるトラックは「頭が0秒より前にはみ出す」＝カットが必要
+  const newOffsetSec = {};
+  const overflow = []; // はみ出すトラック {track, overSec}
   marked.forEach(tr=>{
-    const newOffSec = targetAbs - trackMarkers[tr];
-    setTrackOffsetMs(tr, newOffSec * 1000);
+    const off = targetAbs - trackMarkers[tr];
+    newOffsetSec[tr] = off;
+    if(off < -0.0005){
+      overflow.push({ track: tr, overSec: -off });
+    }
+  });
+
+  if(overflow.length === 0){
+    // はみ出しなし：そのまま揃える
+    applyMarkerAlignment(newOffsetSec, marked, []);
+    return;
+  }
+
+  // はみ出しあり：確認ポップアップ
+  const names = overflow.map(o=>`「${trackDisplayName(o.track)}」（頭が約${o.overSec.toFixed(2)}秒はみ出します）`).join("\n");
+  const msg =
+    "マークの位置で揃えると、次のトラックの頭（マークより前の部分）が先頭からはみ出します：\n\n" +
+    names + "\n\n" +
+    "【OK】はみ出す部分を自動でカットして揃えます。\n" +
+    "【キャンセル】揃えを中止します（手動で好きな位置をカットしてから、もう一度揃えてください）。";
+  const doCut = confirm(msg);
+  if(!doCut){
+    if(typeof fileStatus !== "undefined" && fileStatus) fileStatus.textContent = "揃えを中止しました。手動でカット後にもう一度お試しください。";
+    return;
+  }
+  // 自動カット：はみ出すトラックの頭からoverSec分をカットし、オフセットは0基準に
+  applyMarkerAlignment(newOffsetSec, marked, overflow);
+}
+
+function applyMarkerAlignment(newOffsetSec, marked, overflow){
+  const overflowSet = {};
+  overflow.forEach(o=>{ overflowSet[o.track] = o.overSec; });
+
+  marked.forEach(tr=>{
+    if(overflowSet[tr] != null){
+      // はみ出すトラック：頭の overSec 分をカットして、オフセットを基準(0以上)へ
+      const overSec = overflowSet[tr];
+      // クリップの先頭から overSec をカット（cutTimeRangeFromClips は絶対秒で動作）
+      // 現在のオフセットを一旦0にしてからトラック内0〜overSecをカット
+      setTrackOffsetMs(tr, 0);
+      if(typeof cutTimeRangeFromClips === "function"){
+        cutTimeRangeFromClips(tr, 0, overSec);
+      }
+      // カットは無音ギャップを残すso、残りのクリップを overSec 分前に詰める
+      if(trackClips[tr] && trackClips[tr].length){
+        trackClips[tr].forEach(cl=>{ cl.startSec = Math.max(0, cl.startSec - overSec); });
+      }
+      if(typeof normalizeTrackClips === "function") normalizeTrackClips(tr);
+      if(typeof rebuildTrackBuffer === "function") rebuildTrackBuffer(tr);
+      // カットで頭が overSec 分詰まったので、マーカー位置も前にずらす
+      if(trackMarkers[tr] != null) trackMarkers[tr] = Math.max(0, trackMarkers[tr] - overSec);
+      // カット後、マークが基準位置に来るようオフセットは0
+      setTrackOffsetMs(tr, 0);
+    }else{
+      setTrackOffsetMs(tr, Math.max(0, newOffsetSec[tr]) * 1000);
+    }
   });
   if(typeof invalidateWaveformCache === "function") invalidateWaveformCache();
   if(typeof drawStackedTimelines === "function") drawStackedTimelines();
   if(typeof updateButtons === "function") updateButtons();
-  if(typeof fileStatus !== "undefined" && fileStatus) fileStatus.textContent = `🎯 マークの位置で${marked.length}トラックを揃えました。`;
+  if(typeof fileStatus !== "undefined" && fileStatus){
+    fileStatus.textContent = overflow.length
+      ? `🎯 はみ出し部分をカットして${marked.length}トラックを揃えました。`
+      : `🎯 マークの位置で${marked.length}トラックを揃えました。`;
+  }
 }
 
 function clearAllMarkers(){
