@@ -1015,6 +1015,8 @@ audio{width:100%;margin:8px 0}
 .teb-btn.teb-play.playing{color:#fff;background:rgba(74,222,128,.25) !important;}
 .teb-btn.teb-marker{color:#fbbf24;border-color:rgba(251,191,36,.4) !important;}
 .teb-btn.teb-align:not(:disabled){color:#34d399;border-color:rgba(52,211,153,.4) !important;}
+.teb-btn.teb-allplay{font-size:11px;font-weight:700;}
+.teb-btn.teb-allplay:not(:disabled){color:#5eead4;border-color:rgba(94,234,212,.4) !important;}
 .teb-btn.teb-cut:not(:disabled){color:#f87171;border-color:rgba(248,113,113,.3) !important;}
 .teb-btn.teb-copy:not(:disabled){color:#60a5fa;border-color:rgba(96,165,250,.3) !important;}
 .teb-btn.teb-paste:not(:disabled){color:#4ade80;border-color:rgba(74,222,128,.3) !important;}
@@ -1608,6 +1610,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
           <div class="track-edit-bar-row">
             <span class="track-time-label" id="timeLabelMain">--:--.--</span>
             <button class="teb-btn teb-play" id="tebPlayMain" title="カーソル位置から再生" disabled>▶</button>
+            <button class="teb-btn teb-allplay" title="全トラックを同時再生" disabled>▶全</button>
             <button class="teb-btn teb-stop-play" id="tebStopMain" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarkerMain" data-track="main" title="現在位置にマークを置く">📍</button>
             <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
@@ -1717,6 +1720,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
           <div class="track-edit-bar-row">
             <span class="track-time-label" id="timeLabelTake">--:--.--</span>
             <button class="teb-btn teb-play" id="tebPlayTake" title="カーソル位置から再生" disabled>▶</button>
+            <button class="teb-btn teb-allplay" title="全トラックを同時再生" disabled>▶全</button>
             <button class="teb-btn teb-stop-play" id="tebStopTake" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarkerTake" data-track="take" title="現在位置にマークを置く">📍</button>
             <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
@@ -1844,6 +1848,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
           <div class="track-edit-bar-row">
             <span class="track-time-label" id="timeLabelChorus">--:--.--</span>
             <button class="teb-btn teb-play" id="tebPlayChorus" title="カーソル位置から再生" disabled>▶</button>
+            <button class="teb-btn teb-allplay" title="全トラックを同時再生" disabled>▶全</button>
             <button class="teb-btn teb-stop-play" id="tebStopChorus" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarkerChorus" data-track="chorus" title="現在位置にマークを置く">📍</button>
             <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
@@ -2818,6 +2823,11 @@ function alignTracksByMarker(){
 function applyMarkerAlignment(newOffsetSec, marked, overflow){
   const overflowSet = {};
   overflow.forEach(o=>{ overflowSet[o.track] = o.overSec; });
+
+  // 揃える前に各トラックのundoを保存（元に戻せるように）
+  marked.forEach(tr=>{
+    if(typeof trackPushUndo === "function") trackPushUndo(tr, "マークで揃える");
+  });
 
   marked.forEach(tr=>{
     if(overflowSet[tr] != null){
@@ -5647,6 +5657,7 @@ function createExtraTrackHTML(id, emoji, name){
           <div class="track-edit-bar-row">
             <span class="track-time-label" id="timeLabel${c1}">--:--.--</span>
             <button class="teb-btn teb-play" id="tebPlay${c1}" title="カーソル位置から再生" disabled>▶</button>
+            <button class="teb-btn teb-allplay" title="全トラックを同時再生" disabled>▶全</button>
             <button class="teb-btn teb-stop-play" id="tebStop${c1}" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarker${c1}" data-track="${id}" title="現在位置にマークを置く">📍</button>
             <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
@@ -6055,6 +6066,9 @@ function updateTrackLaneInfo(){
   if(trackCheckLabelChorus) trackCheckLabelChorus.classList.toggle("disabled", !chorusBuffer);
   if(trackStackPlayBtn) trackStackPlayBtn.disabled = !((trackSelectMain&&trackSelectMain.checked&&mainBuffer) || (trackSelectTake&&trackSelectTake.checked&&takeBuffer) || (trackSelectChorus&&trackSelectChorus.checked&&chorusBuffer));
   if(trackAllPlayBtn) trackAllPlayBtn.disabled = !(mainBuffer || takeBuffer || chorusBuffer);
+  // 各トラック内の「▶全」ボタンも同じ条件で有効化
+  const _allPlayEnabled = !!(mainBuffer || takeBuffer || chorusBuffer);
+  document.querySelectorAll(".teb-allplay").forEach(b=>{ b.disabled = !_allPlayEnabled; });
   if(trackStackStopBtn) trackStackStopBtn.disabled = !(mainBuffer || takeBuffer || chorusBuffer);
   if(trackStackMixBtn) trackStackMixBtn.disabled = !(mainBuffer && (takeBuffer || chorusBuffer));
   updateTrackVolumeLabels();
@@ -8317,6 +8331,11 @@ if(trackStackMixBtn){
     const alignBtn = e.target.closest(".teb-align");
     if(alignBtn){
       if(!alignBtn.disabled) alignTracksByMarker();
+      return;
+    }
+    const allPlayBtn = e.target.closest(".teb-allplay");
+    if(allPlayBtn){
+      if(!allPlayBtn.disabled && trackAllPlayBtn) trackAllPlayBtn.click();
       return;
     }
   });
