@@ -5946,7 +5946,8 @@ function drawMiniTrackWave(canvasEl, track, labelColor){
       const xEnd = Math.min(w, ((offsetSec + endInBuffer - viewStartSec) / viewDur) * w);
       const pxStart = Math.floor(xStart);
       const pxEnd = Math.ceil(xEnd);
-      cctx.strokeStyle = labelColor;
+      // 波形は薄めの統一色にして、マーカー/カーソル等の線を見やすくする
+      cctx.strokeStyle = "rgba(148,163,184,0.65)";
       cctx.lineWidth = 1.2 * devicePixelRatio;
       cctx.beginPath();
       for(let x=pxStart; x<=pxEnd; x++){
