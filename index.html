@@ -1017,6 +1017,8 @@ audio{width:100%;margin:8px 0}
 .teb-btn.teb-align:not(:disabled){color:#34d399;border-color:rgba(52,211,153,.4) !important;}
 .teb-btn.teb-allplay{font-size:11px;font-weight:700;}
 .teb-btn.teb-allplay:not(:disabled){color:#5eead4;border-color:rgba(94,234,212,.4) !important;}
+.teb-btn.teb-allrestart{font-size:11px;font-weight:700;}
+.teb-btn.teb-allrestart:not(:disabled){color:#c4b5fd;border-color:rgba(196,181,253,.4) !important;}
 .teb-btn.teb-cut:not(:disabled){color:#f87171;border-color:rgba(248,113,113,.3) !important;}
 .teb-btn.teb-copy:not(:disabled){color:#60a5fa;border-color:rgba(96,165,250,.3) !important;}
 .teb-btn.teb-paste:not(:disabled){color:#4ade80;border-color:rgba(74,222,128,.3) !important;}
@@ -1611,6 +1613,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <span class="track-time-label" id="timeLabelMain">--:--.--</span>
             <button class="teb-btn teb-play" id="tebPlayMain" title="カーソル位置から再生" disabled>▶</button>
             <button class="teb-btn teb-allplay" title="全トラックを同時再生" disabled>▶全</button>
+            <button class="teb-btn teb-allrestart" title="全トラックを最初に戻す" disabled>⏮全</button>
             <button class="teb-btn teb-stop-play" id="tebStopMain" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarkerMain" data-track="main" title="現在位置にマークを置く">📍</button>
             <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
@@ -1721,6 +1724,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <span class="track-time-label" id="timeLabelTake">--:--.--</span>
             <button class="teb-btn teb-play" id="tebPlayTake" title="カーソル位置から再生" disabled>▶</button>
             <button class="teb-btn teb-allplay" title="全トラックを同時再生" disabled>▶全</button>
+            <button class="teb-btn teb-allrestart" title="全トラックを最初に戻す" disabled>⏮全</button>
             <button class="teb-btn teb-stop-play" id="tebStopTake" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarkerTake" data-track="take" title="現在位置にマークを置く">📍</button>
             <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
@@ -1849,6 +1853,7 @@ button.purple{ background:linear-gradient(180deg,#c084fc,#9333ea) !important; co
             <span class="track-time-label" id="timeLabelChorus">--:--.--</span>
             <button class="teb-btn teb-play" id="tebPlayChorus" title="カーソル位置から再生" disabled>▶</button>
             <button class="teb-btn teb-allplay" title="全トラックを同時再生" disabled>▶全</button>
+            <button class="teb-btn teb-allrestart" title="全トラックを最初に戻す" disabled>⏮全</button>
             <button class="teb-btn teb-stop-play" id="tebStopChorus" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarkerChorus" data-track="chorus" title="現在位置にマークを置く">📍</button>
             <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
@@ -5658,6 +5663,7 @@ function createExtraTrackHTML(id, emoji, name){
             <span class="track-time-label" id="timeLabel${c1}">--:--.--</span>
             <button class="teb-btn teb-play" id="tebPlay${c1}" title="カーソル位置から再生" disabled>▶</button>
             <button class="teb-btn teb-allplay" title="全トラックを同時再生" disabled>▶全</button>
+            <button class="teb-btn teb-allrestart" title="全トラックを最初に戻す" disabled>⏮全</button>
             <button class="teb-btn teb-stop-play" id="tebStop${c1}" title="停止">■</button>
             <button class="teb-btn teb-marker" id="tebMarker${c1}" data-track="${id}" title="現在位置にマークを置く">📍</button>
             <button class="teb-btn teb-align" title="マークを付けた全トラックを揃える" disabled>🎯</button>
@@ -6069,6 +6075,7 @@ function updateTrackLaneInfo(){
   // 各トラック内の「▶全」ボタンも同じ条件で有効化
   const _allPlayEnabled = !!(mainBuffer || takeBuffer || chorusBuffer);
   document.querySelectorAll(".teb-allplay").forEach(b=>{ b.disabled = !_allPlayEnabled; });
+  document.querySelectorAll(".teb-allrestart").forEach(b=>{ b.disabled = !_allPlayEnabled; });
   if(trackStackStopBtn) trackStackStopBtn.disabled = !(mainBuffer || takeBuffer || chorusBuffer);
   if(trackStackMixBtn) trackStackMixBtn.disabled = !(mainBuffer && (takeBuffer || chorusBuffer));
   updateTrackVolumeLabels();
@@ -7762,6 +7769,24 @@ function performTrackRestart(track){
   fileStatus.textContent = `${trackDisplayName(track)} を最初に戻しました`;
 }
 
+// 全トラックのカーソルを先頭に戻す（再生も停止）
+function performRestartAllTracks(){
+  if(typeof stopTrackPlayback === "function") stopTrackPlayback();
+  if(typeof audioEl !== "undefined" && audioEl){ try{ audioEl.pause(); }catch(_){} }
+  ['main','take','chorus'].forEach(tr=>{
+    const st = getTrackState(tr);
+    if(st) st.playheadRatio = 0;
+  });
+  if(typeof extraTracks !== "undefined"){
+    extraTracks.forEach(t=>{ const st=getTrackState(t.id); if(st) st.playheadRatio = 0; });
+  }
+  if(typeof playheadRatio !== "undefined") playheadRatio = 0;
+  if(typeof invalidateWaveformCache === "function") invalidateWaveformCache();
+  if(typeof drawStackedTimelines === "function") drawStackedTimelines();
+  if(typeof updateButtons === "function") updateButtons();
+  if(typeof fileStatus !== "undefined" && fileStatus) fileStatus.textContent = "⏮ 全トラックを最初に戻しました";
+}
+
 function performTrackNudge(track, ms){
   if(track === "main"){
     trackClips.main.forEach(cl=>{ cl.startSec = Math.max(0, cl.startSec + ms / 1000); });
@@ -8336,6 +8361,11 @@ if(trackStackMixBtn){
     const allPlayBtn = e.target.closest(".teb-allplay");
     if(allPlayBtn){
       if(!allPlayBtn.disabled && trackAllPlayBtn) trackAllPlayBtn.click();
+      return;
+    }
+    const allRestartBtn = e.target.closest(".teb-allrestart");
+    if(allRestartBtn){
+      if(!allRestartBtn.disabled) performRestartAllTracks();
       return;
     }
   });
