@@ -3445,7 +3445,7 @@ async function startTrackRecording(track){
     try{
       const blob = new Blob(recordedChunks,{type:mediaRecorder.mimeType});
       const arrayBuffer = await blob.arrayBuffer();
-      const decoded = await audioContext.decodeAudioData(arrayBuffer);
+      const decoded = await decodeAudioDataRobust(arrayBuffer);
       if(track === "take"){
         takeInBuffer("take", decoded, "録音");
         takeFxBaked = false; takeFxBackup = null;
@@ -3539,15 +3539,66 @@ if(recChorusBtn) recChorusBtn.onclick = ()=> toggleTrackRecording("chorus");
 
 
 
+// タイムアウト付きPromise（固まり防止）
+function withTimeout(promise, timeoutMs, message){
+  return new Promise((resolve, reject)=>{
+    const timer = setTimeout(()=>reject(new Error(message || "operation timeout")), timeoutMs);
+    promise.then(value=>{ clearTimeout(timer); resolve(value); })
+           .catch(err=>{ clearTimeout(timer); reject(err); });
+  });
+}
+
+// decodeAudioData をコールバック式・Promise式の両対応で呼ぶ（古いSafari等でも成功しやすい）
+function decodeWithContext(ctx2, arrayBuffer){
+  const copy = arrayBuffer.slice(0);
+  return new Promise((resolve, reject)=>{
+    let settled = false;
+    const ok = decoded=>{ if(!settled){ settled = true; resolve(decoded); } };
+    const fail = err=>{ if(!settled){ settled = true; reject(err); } };
+    try{
+      const result = ctx2.decodeAudioData(copy, ok, fail);
+      if(result && typeof result.then === "function") result.then(ok).catch(fail);
+    }catch(err){ fail(err); }
+  });
+}
+
+// 堅牢デコード：既存コンテキスト→失敗時はフレッシュコンテキストで再試行。各20秒でタイムアウト。
+async function decodeAudioDataRobust(arrayBuffer){
+  const errors = [];
+  try{
+    ensureAudioContext();
+    if(audioContext.state === "suspended"){ try{ await audioContext.resume(); }catch(e){} }
+    return await withTimeout(decodeWithContext(audioContext, arrayBuffer), 20000, "audio decode timeout");
+  }catch(err){ errors.push(err); }
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const fresh = new AC();
+    const decoded = await withTimeout(decodeWithContext(fresh, arrayBuffer), 20000, "fresh audio decode timeout");
+    try{ await fresh.close(); }catch(e){}
+    return decoded;
+  }catch(err){ errors.push(err); }
+  throw errors[errors.length - 1] || new Error("decode failed");
+}
+
 async function decodeBlobDirectly(blob){
   ensureAudioContext();
-
   if(audioContext.state === "suspended"){
     try{ await audioContext.resume(); }catch(e){}
   }
-
-  const arrayBuffer = await blob.arrayBuffer();
-  return await audioContext.decodeAudioData(arrayBuffer.slice(0));
+  // file.arrayBuffer() が失敗する環境向けに FileReader フォールバック
+  let arrayBuffer;
+  try{
+    arrayBuffer = await withTimeout(blob.arrayBuffer(), 30000, "file arrayBuffer timeout");
+  }catch(e){
+    arrayBuffer = await withTimeout(new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = ()=>resolve(reader.result);
+      reader.onerror = ()=>reject(reader.error || new Error("file read failed"));
+      reader.readAsArrayBuffer(blob);
+    }), 45000, "file read timeout");
+  }
+  // 堅牢デコード（両対応＋再試行）
+  return await decodeAudioDataRobust(arrayBuffer);
 }
 
 function isIOSLikeDevice(){
